@@ -1,0 +1,57 @@
+@page "/saved-items"
+@using Microsoft.EntityFrameworkCore
+@using Parser123.Data
+@using Parser123.Data.Product
+
+@inject AppDbContext DbContext;
+
+<PageTitle>Сохраненные товары</PageTitle>
+
+<h3>Сохраненные товары</h3>
+
+@if (_products == null)
+{
+    <div>Идет загрузка товаров...</div>
+}
+else
+{
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Товар</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+
+        <tbody>
+        @foreach (var product in _products)
+        {
+            <tr>
+                <td>@product.Name</td>
+                <td>
+                    <a href="/view-logs/@product.Id">Открыть логи</a>
+                    <button type="button" @onclick="async () => await OnDeleteProduct(product)">Удалить товар</button>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Product>? _products;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _products = await DbContext.Products.ToListAsync();
+    }
+
+    private async Task OnDeleteProduct(Product product)
+    {
+        DbContext.Products.Remove(product);
+        await DbContext.SaveChangesAsync();
+
+        _products!.Remove(product);
+    }
+
+}

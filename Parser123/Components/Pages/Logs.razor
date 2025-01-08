@@ -1,0 +1,78 @@
+@page "/view-logs/{id:guid}"
+
+@using MassTransit
+@using Microsoft.EntityFrameworkCore
+@using Parser123.Data
+@using Parser123.Data.ParseLog
+@using Parser123.Messaging.Messages
+
+@inject AppDbContext DbContext;
+@inject IPublishEndpoint Publisher;
+
+<PageTitle>Логи парсинга цен товара</PageTitle>
+
+<h3>Логи парсинга цен товара</h3>
+
+@if (_logs == null)
+{
+    <div>Идет загрузка логов...</div>
+}
+else
+{
+    <table class="table table-bordered">
+        <thead>
+        <tr>
+            <th>Hазвание товара</th>
+            <th>Время парсинга</th>
+            <th>Цена Домотекс</th>
+            <th>Цена Водопарад</th>
+            <th>Ссылка на Домотекс</th>
+            <th>Ссылка на Водопарад</th>
+            <th>Действие</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var log in _logs)
+        {
+            <tr>
+                <td>@log.Product.Name</td>
+                <td>@log.Date</td>
+                <td>@log.DomotexPrice</td>
+                <td>@log.VodoparadPrice</td>
+                <td>
+                    <a href="@log.Product.DomotexLink" target="_blank">Открыть на Домотекс</a>
+                </td>
+                <td>
+                    <a href="@log.Product.VodoparadLink" target="_blank">Открыть на Водопарад</a>
+                </td>
+                <td>
+                    <button type="button" @onclick="async () => await OnDeleteLog(log)">Удалить лог</button>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private List<ParseLog>? _logs;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _logs = await DbContext.ParseLogs.Include(l => l.Product)
+            .Where(l => l.Product.Id == Id)
+            .ToListAsync();
+
+        await Publisher.Publish(new FetchProductPriceMessage(Id));
+    }
+
+    private async Task OnDeleteLog(ParseLog log)
+    {
+        DbContext.ParseLogs.Remove(log);
+        await DbContext.SaveChangesAsync();
+        
+        _logs!.Remove(log);
+    }
+}

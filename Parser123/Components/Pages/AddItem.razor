@@ -1,0 +1,81 @@
+@page "/add-item"
+@using MassTransit
+@using Microsoft.EntityFrameworkCore
+@using Parser123.Data
+@using Parser123.Models
+@using Parser123.Data.Product
+@using Parser123.Messaging.Messages
+
+@inject AppDbContext DbContext
+@inject IPublishEndpoint Publisher;
+
+<PageTitle>Добавить товар</PageTitle>
+
+<h3>Добавить товар</h3>
+
+<EditForm class="form-control" FormName="AddItemForm" Model="@_addItemModel" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator/>
+
+    <div class="form-group">
+        <label for="name">Название товара:</label>
+        <InputText class="form-control" id="name" @bind-Value="_addItemModel.Name" list="productNames"/>
+
+        <datalist id="productNames">
+            @if (_productNames == null)
+            {
+                <option value="Идет загрузка названий продуктов" disabled hidden/>
+            }
+            else
+                foreach (var productName in _productNames)
+                {
+                    <option value="@productName">@productName</option>
+                }
+        </datalist>
+
+        <ValidationMessage For="@(() => _addItemModel.Name)" />
+    </div>
+
+    <div class="form-group">
+        <label for="domotexLink">Ссылка на Домотекс:</label>
+        <InputText id="domotexLink" @bind-Value="_addItemModel.DomotexLink" class="form-control"/>
+        <ValidationMessage For="@(() => _addItemModel.DomotexLink)"/>
+    </div>
+
+    <div class="form-group">
+        <label for="vodoparadLink">Ссылка на Водопарад:</label>
+        <InputText id="vodoparadLink" @bind-Value="_addItemModel.Vodoparad" class="form-control"/>
+        <ValidationMessage For="@(() => _addItemModel.Vodoparad)"/>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Добавить товар</button>
+</EditForm>
+
+@code {
+    private AddItemModel _addItemModel = new();
+    private List<string>? _productNames;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _productNames = await DbContext.Products.Select(p => p.Name).ToListAsync();
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        var newProduct = new Product(
+            _addItemModel.Name,
+            _addItemModel.DomotexLink,
+            _addItemModel.Vodoparad
+        );
+
+        DbContext.Products.Add(newProduct);
+
+        await DbContext.SaveChangesAsync();
+
+        await Publisher.Publish(new FetchProductPriceMessage(newProduct.Id));
+        
+        var name = _addItemModel.Name;
+        _addItemModel = new AddItemModel();
+        _productNames!.Add(name);
+    }
+
+}
